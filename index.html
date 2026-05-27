@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes, viewport-fit=cover">
+    <title>股票盈亏计算器</title>
+    <style>
+        :root {
+            --bg: #f5f7fa; --card-bg: #ffffff; --text: #1e293b; --text-secondary: #475569;
+            --border: #e2e8f0; --primary: #4f46e5; --up-color: #dc2626; --up-bg: #fef2f2;
+            --up-border: #fecaca; --down-color: #16a34a; --down-bg: #f0fdf4;
+            --down-border: #bbf7d0; --neutral: #475569; --shadow: 0 2px 8px rgba(0,0,0,0.04);
+            --radius: 10px; --radius-sm: 8px; --font-mono: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: var(--bg); color: var(--text); line-height:1.5; min-height:100vh;
+            padding: 10px; font-size: 14px; -webkit-tap-highlight-color: transparent;
+        }
+        .app-container { max-width: 500px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
+        .step-page { display: none; flex-direction: column; gap: 10px; animation: fadeSlideIn 0.2s ease; }
+        .step-page.active { display: flex; }
+        @keyframes fadeSlideIn { from { opacity:0; transform: translateY(6px); } to { opacity:1; transform: translateY(0); } }
+        .card {
+            background: var(--card-bg); border-radius: var(--radius);
+            padding: 14px; box-shadow: var(--shadow); border: 1px solid var(--border);
+        }
+        .card-header {
+            font-weight: 650; font-size: 0.95rem; margin-bottom: 10px;
+            display: flex; align-items: center; gap: 6px; color: #0f172a;
+            border-bottom: 1px solid #f1f5f9; padding-bottom: 8px;
+        }
+        .badge {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 24px; height: 24px; border-radius: 6px; font-size: 0.8rem; font-weight: 700;
+            background: #eef2ff; color: var(--primary); flex-shrink: 0;
+        }
+        .input-group { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+        .input-group label { font-size: 0.8rem; color: var(--text-secondary); font-weight: 500; }
+        input, select, .btn {
+            width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+            font-size: 0.9rem; background: #fff; transition: 0.15s; font-family: var(--font-mono);
+            -webkit-appearance: none; appearance: none; min-height: 42px;
+        }
+        input:focus, select:focus { outline: none; border-color: #6366f1; border-width: 2px; box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+        input[readonly] { background: #f8fafc; color: #475569; }
+        select {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='%23475569'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat; background-position: right 10px center; padding-right: 30px;
+        }
+        .btn {
+            display: flex; align-items: center; justify-content: center; gap: 4px;
+            font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; color:#fff;
+            font-size: 0.9rem;
+        }
+        .btn:focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; }
+        .btn-primary { background: var(--primary); box-shadow: 0 2px 8px rgba(79,70,229,0.2); }
+        .btn-primary:active { background: #4338ca; transform: scale(0.98); }
+        .btn-outline { background: #fff; color: var(--primary); border: 1.5px solid var(--primary); }
+        .btn-danger { background: #fff; color: #dc2626; border: 1.5px solid #fecaca; }
+        .btn-sm { padding: 8px 12px; font-size: 0.8rem; width: auto; }
+        .btn-xs { padding: 5px 10px; font-size: 0.75rem; width: auto; border-radius: 6px; }
+        .stock-list-item {
+            display: flex; align-items: center; justify-content: space-between; padding: 10px 12px;
+            background: #f8fafc; border-radius: var(--radius-sm); margin-bottom: 6px;
+            border: 1px solid #e2e8f0; transition: 0.15s;
+        }
+        .stock-list-item:active { background: #f1f5f9; }
+        .stock-list-item.selected { border-color: var(--primary); background: #eef2ff; }
+        .tag-row { display: flex; flex-wrap: nowrap; gap: 6px; overflow-x: auto; padding: 6px 0; }
+        .tag {
+            padding: 7px 12px; border-radius: 18px; font-size: 0.8rem; font-weight: 500; cursor: pointer;
+            border: 1px solid #e2e8f0; background: #fff; color: #475569; white-space: nowrap; flex-shrink: 0;
+            display:flex; align-items:center; transition: 0.15s;
+        }
+        .tag:active { background: #f1f5f9; }
+        .tag.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+        .result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+        .result-item {
+            background: #f8fafc; border-radius: var(--radius-sm); padding: 10px 6px;
+            text-align: center; border: 1px solid #e2e8f0;
+        }
+        .result-item.up { background: var(--up-bg); border-color: var(--up-border); }
+        .result-item.down { background: var(--down-bg); border-color: var(--down-border); }
+        .result-label { font-size:0.7rem; color:var(--text-secondary); margin-bottom:3px; font-weight:500; }
+        .result-value { font-size:1.15rem; font-weight:700; font-family: var(--font-mono); }
+        .result-value.up { color: var(--up-color); }
+        .result-value.down { color: var(--down-color); }
+        .highlight-box {
+            background: #fff9e6; border: 2px solid #f59e0b; border-radius: var(--radius-sm);
+            padding: 12px; margin: 8px 0; display: flex; align-items: center; justify-content: space-between;
+        }
+        .highlight-box .label { font-size:0.75rem; color:#b45309; }
+        .highlight-box .value { font-size:1.4rem; font-weight:700; color:#b45309; }
+        .alert { padding:8px 12px; border-radius: var(--radius-sm); font-size:0.8rem; font-weight:500; margin:6px 0; display:flex; align-items:center; gap:6px; }
+        .alert-profit { background:#fef2f2; color:#991b1b; border:1px solid #fecaca; }
+        .alert-loss { background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; }
+        .alert-info { background:#eff6ff; color:#1e3a8a; border:1px solid #bfdbfe; }
+        .home-hero { text-align:center; padding: 25px 16px; }
+        .home-hero h1 { font-size:1.5rem; font-weight:700; color:#0f172a; }
+        .home-hero p { color:var(--text-secondary); margin:6px 0 18px; font-size:0.9rem; }
+        .footer-nav { display:flex; gap:6px; margin-top:6px; }
+        .empty-state { text-align:center; color:#94a3b8; padding:14px; font-size:0.85rem; }
+        .stock-group { margin-bottom: 6px; border: 1px solid #e2e8f0; border-radius: var(--radius-sm); overflow: hidden; }
+        .stock-group-body { padding: 10px 12px; display:flex; flex-direction: column; gap: 6px; }
+        .stock-group-body .row1 { display:flex; justify-content: space-between; align-items: center; }
+        .stock-group-body .actions { display:flex; gap:6px; }
+        .buy-record-row { display:flex; align-items:center; justify-content:space-between; padding:6px; border-bottom:1px solid #f1f5f9; gap:4px; flex-wrap:wrap; }
+        .buy-record-row input { width:auto; max-width:65px; padding:5px; font-size:0.75rem; }
+        .summary-bar { padding: 8px 10px; background: #f8fafc; border-radius: var(--radius-sm); margin-bottom: 8px; display:flex; justify-content: space-between; align-items: center; }
+        .summary-bar .label { font-size:0.75rem; color:var(--text-secondary); }
+        .summary-bar .value { font-size:0.95rem; font-weight:600; font-family: var(--font-mono); }
+        .fee-table-wrap { overflow-x: auto; margin-top: 6px; }
+        .fee-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; min-width: 300px; }
+        .fee-table th, .fee-table td { padding: 6px 5px; border-bottom: 1px solid #e2e8f0; text-align: center; }
+        .fee-table th { background: #f8fafc; font-weight: 600; color: #1e293b; font-size: 0.7rem; }
+        .fee-table td:first-child { text-align: left; color: #475569; }
+        .unit { font-size: 0.65rem; color: var(--text-secondary); margin-left: 1px; }
+
+        @media (max-width:360px) {
+            .result-value { font-size:1rem; }
+            input, select, .btn { padding:9px 10px; font-size:0.85rem; }
+            .tag { padding:6px 10px; font-size:0.75rem; }
+            .stock-group-body .row1 { font-size:0.85rem; }
+        }
+    </style>
+</head>
+<body>
+<div class="app-container" id="appContainer">
+    <div class="step-page active" id="pageHome">
+        <div class="home-hero"><h1>📊 股票盈亏计算器</h1><p>不用动脑，填数字自动算账</p><button class="btn btn-primary" onclick="goToBuyPage()">开始计算</button></div>
+    </div>
+
+    <div class="step-page" id="pageBuy">
+        <div class="card" id="buyFormCard" style="display:none;">
+            <div class="card-header"><span class="badge">🛒</span> 填写买入记录</div>
+            <div class="input-group"><label>股票名称</label><input type="text" id="buyStockName" placeholder="例如：股票"></div>
+            <div class="input-group"><label>股票类型</label><select id="buyMarket"></select></div>
+            <div class="input-group"><label>买入单价 (元)</label><input type="number" id="buyPrice" placeholder="0.00" step="0.001" min="0"></div>
+            <div class="input-group"><label>买入数量 (股)</label><input type="number" id="buyShares" placeholder="100" step="100" min="100" value="100"></div>
+            <div class="input-group"><label>佣金费率 (‱)</label><input type="number" id="buyCommissionRate" placeholder="例如：万1填1" step="0.1" min="0"></div>
+            <button class="btn btn-primary" onclick="addNewStock()">➕ 添加股票</button>
+        </div>
+
+        <div class="card" id="buyRecordListCard">
+            <div class="card-header"><span class="badge">📋</span> 我的持仓</div>
+            <div id="buyRecordList"></div>
+            <div style="display:flex; gap:6px; margin-top:8px;">
+                <button class="btn btn-outline btn-sm" style="flex:1;" onclick="showBuyForm()">➕ 添加新股</button>
+                <button class="btn btn-outline btn-sm" style="flex:1;" onclick="goToSellPage()">📊 卖出</button>
+            </div>
+        </div>
+
+        <div class="card" id="editSummaryCard" style="display:none;">
+            <div class="card-header"><span class="badge">✏️</span> <span id="editSummaryTitle">编辑买入记录</span></div>
+            <div class="summary-bar" id="editSummaryBar"></div>
+            <div id="editBuyRecordList"></div>
+            <button class="btn btn-primary" onclick="confirmEditSummary()">✅ 确定</button>
+            <button class="btn btn-outline btn-sm" style="margin-top:6px;" onclick="cancelEditMode()">← 返回持仓</button>
+        </div>
+
+        <div class="card" id="addBuyCard" style="display:none;">
+            <div class="card-header"><span class="badge">➕</span> 追加买入</div>
+            <div class="input-group"><label>股票名称</label><input type="text" id="addBuyStockName" readonly></div>
+            <div class="input-group"><label>股票类型</label><input type="text" id="addBuyMarket" readonly></div>
+            <div class="input-group"><label>新买入单价 (元)</label><input type="number" id="addBuyPrice" placeholder="0.00" step="0.001" min="0"></div>
+            <div class="input-group"><label>新买入数量 (股)</label><input type="number" id="addBuyShares" placeholder="100" step="100" min="100" value="100"></div>
+            <div class="input-group"><label>佣金费率 (‱)</label><input type="number" id="addBuyCommissionRate" placeholder="沿用首次买入费率" step="0.1" min="0"></div>
+            <input type="hidden" id="addingStockId" value="">
+            <button class="btn btn-primary" onclick="confirmAddBuy()">💾 保存</button>
+            <button class="btn btn-outline btn-sm" style="margin-top:6px;" onclick="cancelEditMode()">← 返回持仓</button>
+        </div>
+    </div>
+
+    <div class="step-page" id="pageSell">
+        <div class="card">
+            <div class="card-header"><span class="badge">💹</span> 选择股票并设置卖出</div>
+            <div id="sellStockList" style="margin-bottom:8px;"></div>
+            <div id="sellForm" style="display:none;">
+                <div class="input-group"><label>当前现价 (元)</label><input type="number" id="sellCurrentPrice" placeholder="0.00" step="0.001" min="0"></div>
+                <div class="input-group"><label>计划卖出价 (元)</label><input type="number" id="sellPrice" placeholder="0.00" step="0.001" min="0"></div>
+                <div class="input-group"><label>卖出数量 (股)</label><select id="sellSharesSelect"></select></div>
+                <button class="btn btn-primary" onclick="saveAndGoResult()">📊 生成结果</button>
+            </div>
+        </div>
+        <button class="btn btn-outline btn-sm" style="margin-top:8px;" onclick="goToBuyPage()">← 返回持仓</button>
+    </div>
+
+    <div class="step-page" id="pageResult">
+        <div class="card">
+            <div class="card-header"><span class="badge">📊</span> 全部持仓汇总</div>
+            <div class="result-grid">
+                <div class="result-item"><div class="result-label">💰 总持仓成本</div><div class="result-value" id="sumCost">—</div></div>
+                <div class="result-item"><div class="result-label">📈 当前总市值</div><div class="result-value" id="sumMarket">—</div></div>
+                <div class="result-item"><div class="result-label">📊 整体浮动盈亏</div><div class="result-value" id="sumFloatPnL">—</div></div>
+                <div class="result-item"><div class="result-label">📐 整体盈亏率</div><div class="result-value" id="sumFloatRate">—</div></div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header"><span class="badge">📐</span> 股票详情</div>
+            <div class="tag-row" id="resultStockTabs"></div>
+            <div id="resultAlert"></div>
+            <div class="highlight-box"><span class="label">🎯 保本卖出价</span><span class="value" id="detailBreakeven">—</span></div>
+            <div class="result-grid" id="detailResultGrid"></div>
+            <button class="btn btn-outline" style="margin-top:10px;" onclick="openFeeDetail()">📋 费用明细</button>
+        </div>
+        <div class="footer-nav">
+            <button class="btn btn-outline btn-sm" onclick="goToSellPage()">← 返回修改</button>
+            <button class="btn btn-outline btn-sm" onclick="goToBuyPage()">📋 返回持仓</button>
+            <button class="btn btn-danger btn-sm" onclick="clearAllData()">🗑️ 一键清空</button>
+        </div>
+    </div>
+
+    <div class="step-page" id="pageFeeDetail">
+        <div class="card">
+            <div class="card-header"><span class="badge">📋</span> <span id="feeDetailTitle">费用明细</span></div>
+            <div class="fee-table-wrap" id="feeTableContainer"></div>
+            <button class="btn btn-outline btn-sm" style="margin-top:10px;" onclick="closeFeeDetail()">← 返回</button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const MARKETS = {
+        'A股沪市': { minCommission:5, stampRate:0.0005, transferRate:0.00001, handlingRate:0.0000341, regulatoryRate:0.000002, settlementRate:0, miscRate:0, stampSell:true },
+        'A股深市': { minCommission:5, stampRate:0.0005, transferRate:0, handlingRate:0.0000341, regulatoryRate:0.000002, settlementRate:0, miscRate:0, stampSell:true },
+        'ETF沪市': { minCommission:5, stampRate:0, transferRate:0.00001, handlingRate:0.000004, regulatoryRate:0.000002, settlementRate:0, miscRate:0, stampSell:false },
+        'ETF深市': { minCommission:5, stampRate:0, transferRate:0, handlingRate:0.000004, regulatoryRate:0.000002, settlementRate:0, miscRate:0, stampSell:false },
+        '港股': { minCommission:30, stampRate:0.001, transferRate:0, handlingRate:0, regulatoryRate:0, settlementRate:0, miscRate:0.000127, stampSell:true },
+        '美股': { minCommission:0.99, stampRate:0, transferRate:0, handlingRate:0, regulatoryRate:0.000051, settlementRate:0, miscRate:0, stampSell:false },
+        'B股沪市': { minCommission:1, stampRate:0.0005, transferRate:0, handlingRate:0, regulatoryRate:0, settlementRate:0.00002, miscRate:0, stampSell:true },
+        'B股深市': { minCommission:5, stampRate:0.0005, transferRate:0, handlingRate:0, regulatoryRate:0, settlementRate:0.00002, miscRate:0, stampSell:true }
+    };
+    const ALL_MARKETS = Object.keys(MARKETS);
+    let stocks = {};
+    let currentDetailId = null;
+    let selectedSellId = null;
+    const STORAGE_KEY = 'stock_calc_v1.1';
+
+    function saveData() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(stocks)); } catch(e){} }
+    function loadData() { try { const d=localStorage.getItem(STORAGE_KEY); if(d) stocks=JSON.parse(d); } catch(e){ stocks={}; } }
+
+    function calcCommission(amount, rate, min) { if(!rate||rate<=0) return min; return Math.max(amount*rate/10000, min); }
+    function getRegulatoryRate(market) { const m = MARKETS[market]; return (m.transferRate||0) + (m.handlingRate||0) + (m.regulatoryRate||0); }
+    function getSellTotalRate(market, commRate) { const m = MARKETS[market]; return (commRate/10000) + getRegulatoryRate(market) + (m.stampSell?m.stampRate:0) + (m.settlementRate||0) + (m.miscRate||0); }
+    function getBuyCost(b, market) { const amt=(b.price||0)*(b.shares||0); const comm=calcCommission(amt, b.commissionRate||0, MARKETS[market].minCommission); const reg=getRegulatoryRate(market); const fee=amt*reg + amt*(MARKETS[market].settlementRate||0) + amt*(MARKETS[market].miscRate||0); return amt+comm+fee; }
+    function getBreakevenPerBatch(totalCost, shares, market, commRate) { if(shares<=0) return null; const m = MARKETS[market]; return (totalCost/shares + m.minCommission/shares) / (1 - getSellTotalRate(market, commRate)); }
+
+    function getAllBatches(stock) { return (stock.buys||[]).map(b => ({ price:b.price, shares:b.shares, commissionRate:b.commissionRate, cost:getBuyCost(b, stock.market), remaining:b.shares })); }
+    function getTotalCostAll(stock) { return getAllBatches(stock).reduce((s,b)=>s+b.cost,0); }
+    function getTotalSharesAll(stock) { return getAllBatches(stock).reduce((s,b)=>s+b.shares,0); }
+    function getAvgCostAll(stock) { const s=getTotalSharesAll(stock); return s>0?getTotalCostAll(stock)/s:null; }
+
+    function calcFIFOFloatPnL(stock, currentPrice) {
+        const totalCost = getTotalCostAll(stock); const totalShares = getTotalSharesAll(stock);
+        if(totalShares<=0 || currentPrice==null) return 0;
+        const breakeven = getBreakevenPerBatch(totalCost, totalShares, stock.market, (stock.buys&&stock.buys[0]?stock.buys[0].commissionRate:0));
+        return breakeven ? (currentPrice - breakeven) * totalShares : 0;
+    }
+    function calcFIFOPnLRate(stock, currentPrice) {
+        const floatPnL = calcFIFOFloatPnL(stock, currentPrice);
+        const totalCost = getTotalCostAll(stock);
+        return (floatPnL!=null && totalCost>0) ? (floatPnL/totalCost*100) : 0;
+    }
+    function calcFIFOEstimatePnL(stock, targetPrice) {
+        if(targetPrice==null) return null;
+        let total = 0, remaining = stock.sellShares || 0;
+        const buys = stock.buys||[];
+        for(let b of buys){ if(remaining<=0) break; const take = Math.min(b.shares, remaining); const bp = getBreakevenPerBatch(getBuyCost(b, stock.market), b.shares, stock.market, b.commissionRate); if(bp!=null) total += (targetPrice - bp) * take; remaining -= take; }
+        return total;
+    }
+
+    function getShares(stock) { return getTotalSharesAll(stock); }
+    function getAvgCost(stock) { return getAvgCostAll(stock); }
+
+    function navigate(page) { document.querySelectorAll('.step-page').forEach(p=>p.classList.remove('active')); document.getElementById(page).classList.add('active'); }
+    window.goToHome = ()=>navigate('pageHome');
+    window.goToBuyPage = ()=>{ renderBuyPage(); navigate('pageBuy'); };
+    window.goToSellPage = ()=>{ renderSellPage(); navigate('pageSell'); };
+    window.goToResultPage = ()=>{ renderResultPage(); navigate('pageResult'); };
+
+    function populateMarketSelect(sel, selected) { sel.innerHTML = ALL_MARKETS.map(m=>`<option value="${m}" ${m===selected?'selected':''}>${m}</option>`).join(''); }
+
+    // ---------- 买入/持仓页视图控制 ----------
+    function renderBuyPage() {
+        populateMarketSelect(document.getElementById('buyMarket'), 'A股深市');
+        if (Object.keys(stocks).length > 0) { showHoldingsView(); } else { showBuyFormView(); }
+        renderBuyRecordList();
+    }
+    function showBuyFormView() { document.getElementById('buyFormCard').style.display='block'; document.getElementById('buyRecordListCard').style.display='none'; document.getElementById('editSummaryCard').style.display='none'; document.getElementById('addBuyCard').style.display='none'; }
+    function showHoldingsView() { document.getElementById('buyFormCard').style.display='none'; document.getElementById('buyRecordListCard').style.display='block'; document.getElementById('editSummaryCard').style.display='none'; document.getElementById('addBuyCard').style.display='none'; }
+    window.showBuyForm = function() { showBuyFormView(); renderBuyRecordList(); };
+
+    window.addNewStock = function(){
+        const n=document.getElementById('buyStockName').value.trim();
+        if(!n){ alert('请输入股票名称'); return; }
+        const m=document.getElementById('buyMarket').value;
+        const p=parseFloat(document.getElementById('buyPrice').value);
+        const sh=parseInt(document.getElementById('buyShares').value);
+        const r=parseFloat(document.getElementById('buyCommissionRate').value);
+        if(isNaN(p)||p<=0||isNaN(sh)||sh<100){ alert('请填写有效的单价和股数'); return; }
+        const id='s'+Date.now();
+        stocks[id]={name:n,market:m,buys:[],currentPrice:null,sellPrice:null,sellShares:100};
+        stocks[id].buys.push({price:p,shares:sh,commissionRate:isNaN(r)?0:r});
+        saveData();
+        document.getElementById('buyStockName').value='';
+        document.getElementById('buyPrice').value='';
+        document.getElementById('buyShares').value='100';
+        document.getElementById('buyCommissionRate').value='';
+        showHoldingsView();
+        renderBuyRecordList();
+    };
+
+    function renderBuyRecordList(){
+        const l=document.getElementById('buyRecordList');
+        const ids=Object.keys(stocks);
+        if(ids.length===0){ l.innerHTML='<p class="empty-state">暂无持仓，请添加股票</p>'; return; }
+        let h='';
+        ids.forEach(id=>{
+            const s=stocks[id]; const av=getAvgCost(s); const sh=getShares(s);
+            h+=`<div class="stock-group"><div class="stock-group-body">
+                <div class="row1"><strong>${s.name}</strong><span style="font-size:0.8rem;color:#475569;">成本 ${av?av.toFixed(3):'—'} / ${sh}股</span></div>
+                <div class="actions">
+                    <button class="btn btn-outline btn-xs" onclick="openEditPanel('${id}')">编辑</button>
+                    <button class="btn btn-outline btn-xs" onclick="openAddPanel('${id}')">追加</button>
+                    <button class="btn btn-danger btn-xs" onclick="deleteWholeStock('${id}')">删除</button>
+                </div>
+            </div></div>`;
+        });
+        l.innerHTML=h;
+    }
+    window.openEditPanel = function(id){ showEditSummary(id); };
+    window.openAddPanel = function(id){ showAddBuy(id); };
+    window.deleteWholeStock = function(id){ if(!confirm('确定删除该股票的所有持仓记录吗？'))return; delete stocks[id]; saveData(); renderBuyRecordList(); if(Object.keys(stocks).length===0) showBuyFormView(); };
+
+    // 编辑汇总
+    function showEditSummary(stockId) {
+        const s=stocks[stockId]; if(!s) return;
+        document.getElementById('buyFormCard').style.display='none';
+        document.getElementById('buyRecordListCard').style.display='none';
+        document.getElementById('editSummaryCard').style.display='block';
+        document.getElementById('addBuyCard').style.display='none';
+        document.getElementById('editSummaryTitle').textContent='编辑：'+s.name;
+        window._editingStockId=stockId;
+        renderEditSummary(stockId);
+    }
+    function renderEditSummary(stockId){
+        const s=stocks[stockId];
+        const sh=getShares(s); const av=getAvgCost(s);
+        document.getElementById('editSummaryBar').innerHTML=`<span class="label">总持股数</span><span class="value">${sh}股</span><span class="label">平均成本</span><span class="value">${av?av.toFixed(3):'—'}元</span>`;
+        const l=document.getElementById('editBuyRecordList');
+        let h='';
+        (s.buys||[]).forEach((b,i)=>{
+            const a=(b.price||0)*(b.shares||0);
+            h+=`<div class="buy-record-row"><span>#${i+1}</span>
+                <input type="number" value="${b.price||''}" step="0.001" min="0.01" id="recPrice${i}" oninput="onEditRecChange(${i})">
+                <input type="number" value="${b.shares||''}" step="100" min="100" id="recShares${i}" oninput="onEditRecChange(${i})">
+                <input type="number" value="${b.commissionRate||''}" step="0.1" min="0" id="recRate${i}" oninput="onEditRecChange(${i})">
+                <span>${a.toFixed(2)}元</span>
+                <button class="btn btn-danger btn-xs" onclick="deleteEditRecord(${i})">删除</button></div>`;
+        });
+        l.innerHTML=h;
+    }
+    window.onEditRecChange = function(i){
+        const s=stocks[window._editingStockId]; if(!s) return;
+        const p=parseFloat(document.getElementById('recPrice'+i).value);
+        const sh=parseInt(document.getElementById('recShares'+i).value);
+        const r=parseFloat(document.getElementById('recRate'+i).value);
+        if(isNaN(p)||isNaN(sh)) return;
+        s.buys[i]={price:p,shares:sh,commissionRate:isNaN(r)?0:r};
+        const ns=getShares(s); const na=getAvgCost(s);
+        document.getElementById('editSummaryBar').innerHTML=`<span class="label">总持股数</span><span class="value">${ns}股</span><span class="label">平均成本</span><span class="value">${na?na.toFixed(3):'—'}元</span>`;
+        saveData();
+    };
+    window.deleteEditRecord = function(i){ const s=stocks[window._editingStockId]; if(!s||s.buys.length<=1){ alert('至少保留一条买入记录'); return; } s.buys.splice(i,1); saveData(); renderEditSummary(window._editingStockId); renderBuyRecordList(); };
+    window.confirmEditSummary = function(){ saveData(); showHoldingsView(); renderBuyRecordList(); };
+
+    // 追加买入
+    function showAddBuy(stockId) {
+        const s=stocks[stockId]; if(!s) return;
+        document.getElementById('buyFormCard').style.display='none';
+        document.getElementById('buyRecordListCard').style.display='none';
+        document.getElementById('editSummaryCard').style.display='none';
+        document.getElementById('addBuyCard').style.display='block';
+        document.getElementById('addBuyStockName').value=s.name;
+        document.getElementById('addBuyMarket').value=s.market;
+        document.getElementById('addBuyPrice').value='';
+        document.getElementById('addBuyShares').value='100';
+        const fr=s.buys?.[0]?.commissionRate;
+        document.getElementById('addBuyCommissionRate').value=fr?fr:'';
+        document.getElementById('addingStockId').value=stockId;
+    }
+    window.confirmAddBuy = function(){
+        const sid=document.getElementById('addingStockId').value;
+        const s=stocks[sid]; if(!s) return;
+        const p=parseFloat(document.getElementById('addBuyPrice').value);
+        const sh=parseInt(document.getElementById('addBuyShares').value);
+        const r=parseFloat(document.getElementById('addBuyCommissionRate').value);
+        if(isNaN(p)||p<=0||isNaN(sh)||sh<100){ alert('请填写有效的单价和股数'); return; }
+        s.buys.push({price:p,shares:sh,commissionRate:isNaN(r)?0:r});
+        saveData();
+        showHoldingsView();
+        renderBuyRecordList();
+    };
+    window.cancelEditMode = function(){ showHoldingsView(); renderBuyRecordList(); };
+
+    // ---------- 卖出页 ----------
+    function renderSellPage(){
+        const l=document.getElementById('sellStockList');
+        const ids=Object.keys(stocks);
+        if(ids.length===0){ l.innerHTML='<p class="empty-state">暂无股票，请先录入买入记录。</p>'; selectedSellId=null; document.getElementById('sellForm').style.display='none'; return; }
+        l.innerHTML=ids.map(id=>{ const s=stocks[id]; return `<div class="stock-list-item${selectedSellId===id?' selected':''}" onclick="selectSellStock('${id}')"><div class="stock-info"><span class="stock-name">${s.name}</span></div></div>`; }).join('');
+        if(selectedSellId && stocks[selectedSellId]) showSellForm(selectedSellId);
+        else document.getElementById('sellForm').style.display='none';
+    }
+    window.selectSellStock = function(id){ selectedSellId=id; renderSellPage(); };
+    function showSellForm(id){ const s=stocks[id]; document.getElementById('sellForm').style.display='block'; document.getElementById('sellCurrentPrice').value=s.currentPrice??''; document.getElementById('sellPrice').value=s.sellPrice??''; const t=getShares(s); const sel=document.getElementById('sellSharesSelect'); sel.innerHTML=''; for(let i=100;i<=t;i+=100) sel.innerHTML+=`<option value="${i}" ${i===s.sellShares?' selected':''}>${i} 股</option>`; }
+    window.saveAndGoResult = function(){ if(!selectedSellId) return alert('请先选择一只股票'); const s=stocks[selectedSellId]; s.currentPrice=parseFloat(document.getElementById('sellCurrentPrice').value)||null; s.sellPrice=parseFloat(document.getElementById('sellPrice').value)||null; s.sellShares=parseInt(document.getElementById('sellSharesSelect').value)||100; saveData(); goToResultPage(); };
+
+    // ---------- 结果页 ----------
+    function renderResultPage(){ const ids=Object.keys(stocks); if(ids.length===0){alert('暂无数据');navigate('pageBuy');return;} if(!currentDetailId||!stocks[currentDetailId]) currentDetailId=ids[0]; renderResultSummary(); renderResultTabs(); renderStockDetail(currentDetailId); }
+    function renderResultSummary(){
+        let totalCost = 0, totalMarket = 0, totalFloat = 0;
+        for(let id in stocks){
+            const s = stocks[id];
+            const batches = getAllBatches(s);
+            totalCost += batches.reduce((sum,b)=>sum+b.cost,0);
+            if(s.currentPrice != null && s.currentPrice > 0){
+                batches.forEach(b => {
+                    totalMarket += s.currentPrice * b.shares;
+                    const bp = getBreakevenPerBatch(b.cost, b.shares, s.market, b.commissionRate);
+                    if(bp != null) totalFloat += (s.currentPrice - bp) * b.shares;
+                });
+            }
+        }
+        document.getElementById('sumCost').textContent = totalCost > 0 ? totalCost.toFixed(2) + '元' : '0.00元';
+        document.getElementById('sumMarket').textContent = totalMarket > 0 ? totalMarket.toFixed(2) + '元' : '0.00元';
+        const floatEl = document.getElementById('sumFloatPnL');
+        floatEl.textContent = (totalFloat >= 0 ? '+' : '') + totalFloat.toFixed(2) + '元';
+        floatEl.className = 'result-value ' + (totalFloat > 0 ? 'up' : (totalFloat < 0 ? 'down' : ''));
+        const rateEl = document.getElementById('sumFloatRate');
+        if(totalCost > 0){
+            const rate = totalFloat / totalCost * 100;
+            rateEl.textContent = (rate >= 0 ? '+' : '') + rate.toFixed(2) + '%';
+            rateEl.className = 'result-value ' + (rate > 0 ? 'up' : (rate < 0 ? 'down' : ''));
+        } else { rateEl.textContent = '0.00%'; rateEl.className = 'result-value'; }
+    }
+    function renderResultTabs(){ document.getElementById('resultStockTabs').innerHTML=Object.keys(stocks).map(id=>`<div class="tag${id===currentDetailId?' active':''}" onclick="switchResultStock('${id}')">${stocks[id].name}</div>`).join(''); }
+    window.switchResultStock = function(id){ currentDetailId=id; renderResultPage(); };
+
+    function renderStockDetail(id){
+        const s = stocks[id];
+        const totalCost = getTotalCostAll(s);
+        const totalShares = getTotalSharesAll(s);
+        const avgCost = totalShares > 0 ? totalCost / totalShares : null;
+        const cp = s.currentPrice, sp = s.sellPrice, ss = s.sellShares||100;
+        const rate = (s.buys&&s.buys.length>0) ? (s.buys[0].commissionRate||0) : 0;
+
+        const breakeven = (totalCost > 0 && totalShares > 0) ? getBreakevenPerBatch(totalCost, totalShares, s.market, rate) : null;
+
+        const floatPnL = (cp != null && breakeven != null) ? (cp - breakeven) * totalShares : 0;
+        const floatRate = (totalCost > 0 && floatPnL !== null) ? (floatPnL / totalCost) * 100 : 0;
+
+        const marketValue = (cp != null) ? cp * totalShares : 0;
+        const expectedMarketValue = (sp != null && ss > 0) ? sp * ss : null;
+        const estimatePnL = sp ? calcFIFOEstimatePnL(s, sp) : null;
+
+        let estimateRate = null;
+        if(sp && ss > 0 && estimatePnL != null){
+            let fifoCostSold = 0, remaining = ss;
+            const m = MARKETS[s.market];
+            const sellAmount = sp * ss;
+            const comm = calcCommission(sellAmount, rate, m.minCommission);
+            const reg = sellAmount * getRegulatoryRate(s.market);
+            const stamp = sellAmount * (m.stampSell ? m.stampRate : 0);
+            const settle = sellAmount * m.settlementRate;
+            const misc = sellAmount * m.miscRate;
+            const totalSellFees = comm + reg + stamp + settle + misc;
+            for(let b of (s.buys||[])){
+                if(remaining<=0) break;
+                const take = Math.min(b.shares, remaining);
+                fifoCostSold += getBuyCost(b, s.market) * (take / b.shares);
+                remaining -= take;
+            }
+            const denom = fifoCostSold + totalSellFees;
+            if(denom > 0) estimateRate = (estimatePnL / denom) * 100;
+        }
+
+        let html = '';
+        html += renderItem('📦 持仓总成本', totalCost > 0 ? totalCost.toFixed(2) + '元' : '0.00元');
+        html += renderItem('💵 每股成本价', avgCost != null ? avgCost.toFixed(3) + '元/股' : '—');
+        html += renderPnLItem('🌊 浮动盈亏', floatPnL, '元');
+        html += renderPnLItem('📐 浮动盈亏率', floatRate, '%');
+        html += renderItem('📈 当前市值', marketValue > 0 ? marketValue.toFixed(2) + '元' : '0.00元');
+        html += renderItem('🎯 预期市值', expectedMarketValue != null ? expectedMarketValue.toFixed(2) + '元' : '—');
+        html += renderPnLItem('✅ 预期卖出盈亏', estimatePnL, '元');
+        html += renderPnLItem('📊 预期盈亏率', estimateRate, '%');
+
+        document.getElementById('detailResultGrid').innerHTML = html;
+        document.getElementById('detailBreakeven').textContent = breakeven ? breakeven.toFixed(3) + '元' : '—';
+
+        const al=document.getElementById('resultAlert');
+        if(estimatePnL != null){
+            if(estimatePnL > 0) al.innerHTML = '<div class="alert alert-profit">🔴 按卖出价将盈利 +' + estimatePnL.toFixed(2) + '元</div>';
+            else if(estimatePnL < 0) al.innerHTML = '<div class="alert alert-loss">🟢 按卖出价，预估亏损 ' + estimatePnL.toFixed(2) + '元，该价位暂无法保本。</div>';
+            else al.innerHTML = '<div class="alert alert-info">⚖️ 刚好保本</div>';
+        } else {
+            al.innerHTML = '<div class="alert alert-info">📝 请在卖出页设置卖出价以查看预估盈亏</div>';
+        }
+    }
+
+    function renderItem(label, value) { return `<div class="result-item"><div class="result-label">${label}</div><div class="result-value">${value}</div></div>`; }
+    function renderPnLItem(label, value, unit) {
+        if(value == null) return renderItem(label, '—');
+        const cls = value > 0 ? 'up' : (value < 0 ? 'down' : '');
+        const prefix = value > 0 ? '+' : '';
+        return `<div class="result-item ${cls}"><div class="result-label">${label}</div><div class="result-value ${cls}">${prefix}${value.toFixed(2)}${unit}</div></div>`;
+    }
+
+    // ---------- 费用明细页（修复市值单位）----------
+    window.openFeeDetail = function() { if(!currentDetailId) return; renderFeeDetail(currentDetailId); navigate('pageFeeDetail'); };
+    window.closeFeeDetail = function() { navigate('pageResult'); };
+
+    function renderFeeDetail(stockId) {
+        const s = stocks[stockId];
+        document.getElementById('feeDetailTitle').textContent = s.name + ' 费用明细';
+        const cp = s.currentPrice, sp = s.sellPrice, ss = s.sellShares || 100;
+        const rate = (s.buys && s.buys[0]) ? (s.buys[0].commissionRate || 0) : 0;
+        const m = MARKETS[s.market];
+        const isUS = s.market === '美股', isHK = s.market === '港股';
+        const totalShares = getTotalSharesAll(s);
+        let totalBuyAmount = 0;
+        (s.buys||[]).forEach(b => { totalBuyAmount += (b.price||0) * (b.shares||0); });
+        const buyMarketVal = totalBuyAmount;
+        const sellMarketVal = sp != null && ss > 0 ? sp * ss : null;
+
+        const buyFees = { comm:0, stamp:0, transfer:0, handling:0, regulatory:0, settle:0, misc:0 };
+        (s.buys||[]).forEach(b => {
+            const amt = (b.price||0) * (b.shares||0);
+            const comm = calcCommission(amt, b.commissionRate || 0, m.minCommission);
+            buyFees.comm += comm;
+            buyFees.transfer += amt * m.transferRate;
+            buyFees.handling += amt * m.handlingRate;
+            buyFees.regulatory += amt * m.regulatoryRate;
+            buyFees.settle += amt * m.settlementRate;
+            buyFees.misc += amt * m.miscRate;
+        });
+
+        let sellFees = null;
+        if (sp && ss > 0) {
+            const amt = sp * ss;
+            sellFees = {
+                comm: calcCommission(amt, rate, m.minCommission),
+                stamp: amt * (m.stampSell ? m.stampRate : 0),
+                transfer: amt * m.transferRate,
+                handling: amt * m.handlingRate,
+                regulatory: amt * m.regulatoryRate,
+                settle: amt * m.settlementRate,
+                misc: amt * m.miscRate
+            };
+        }
+
+        const fields = [
+            { key: 'shares', label: '股数', isShares: true },
+            { key: 'marketVal', label: '市值', isValue: true },
+            { key: 'stamp', label: '印花税' },
+            { key: 'comm', label: '净佣金' },
+            { key: 'transfer', label: '过户费' },
+            { key: 'handling', label: '经手费' },
+            { key: 'regulatory', label: '证管费' },
+            { key: 'settle', label: '结算费' }
+        ];
+        if (isUS) { fields.splice(5, 2, { key: 'combined', label: '规费', combine: ['handling','regulatory'] }); }
+        if (isHK) fields.push({ key: 'misc', label: '其他费' });
+
+        let html = '<table class="fee-table"><thead><tr><th>费用项</th><th>买入</th><th>卖出</th></tr></thead><tbody>';
+
+        fields.forEach(fd => {
+            let buyVal, sellVal;
+            if (fd.isValue) {
+                buyVal = buyMarketVal > 0 ? buyMarketVal.toFixed(2) : '—';
+                sellVal = sellMarketVal != null ? sellMarketVal.toFixed(2) : '—';
+            } else if (fd.isShares) {
+                buyVal = totalShares;
+                sellVal = ss;
+            } else if (fd.combine) {
+                buyVal = (buyFees[fd.combine[0]] || 0) + (buyFees[fd.combine[1]] || 0);
+                sellVal = sellFees ? (sellFees[fd.combine[0]] + sellFees[fd.combine[1]]) : '—';
+            } else {
+                buyVal = buyFees[fd.key] || 0;
+                sellVal = sellFees ? (sellFees[fd.key] || 0) : '—';
+            }
+            const buyDisplay = typeof buyVal === 'number' ? (fd.isShares ? buyVal : buyVal.toFixed(2)) : buyVal;
+            const sellDisplay = typeof sellVal === 'number' ? (fd.isShares ? sellVal : sellVal.toFixed(2)) : sellVal;
+            // 修复：市值行明确单位
+            let buyUnit = '';
+            let sellUnit = '';
+            if (fd.isShares) {
+                buyUnit = '股';
+                sellUnit = '股';
+            } else if (fd.isValue) {
+                buyUnit = '元';
+                sellUnit = '元';
+            } else if (typeof buyVal === 'number') {
+                buyUnit = '元';
+                sellUnit = (typeof sellVal === 'number') ? '元' : '';
+            }
+            html += `<tr><td>${fd.label}</td><td>${buyDisplay}${buyUnit ? `<span class="unit">${buyUnit}</span>` : ''}</td><td>${sellDisplay}${sellUnit ? `<span class="unit">${sellUnit}</span>` : ''}</td></tr>`;
+        });
+
+        html += '</tbody></table>';
+        document.getElementById('feeTableContainer').innerHTML = html;
+    }
+
+    window.clearAllData = function(){ if(!confirm('确定清空所有数据吗？')) return; stocks={}; saveData(); currentDetailId=null; selectedSellId=null; navigate('pageHome'); };
+    loadData();
+    populateMarketSelect(document.getElementById('buyMarket'), 'A股深市');
+})();
+</script>
+</body>
+</html>
